@@ -15,28 +15,28 @@
   "license": "MIT",
   "commands": [
     {
-      "name": "pick-jira-ticket",
+      "name": "picker",
       "title": "Pick Jira Ticket",
       "subtitle": "Add a ticket to today's list and start tracking time",
       "description": "Choose a Jira ticket, add it to today's list and start or stop a timer to track your work",
       "mode": "view"
     },
     {
-      "name": "view-worklogs",
+      "name": "worklogs",
       "title": "View worklogs",
       "subtitle": "See your tracked time at a glance",
       "description": "View all worklogs for the current month",
       "mode": "view"
     },
     {
-      "name": "jira-worklogs-menubar",
+      "name": "menubar",
       "title": "Jira Worklogs Menubar",
       "subtitle": "Show your worklogs in the menu bar",
       "description": "Enable a menu bar view to quickly see today's tracked time and access your Jira worklogs anytime",
       "mode": "menu-bar"
     },
     {
-      "name": "view-worklogs-calendar",
+      "name": "calendar",
       "title": "View Worklogs Calendar",
       "subtitle": "View your worklogs in calendar view",
       "description": "View your tracked time in a clear calendar overview",
