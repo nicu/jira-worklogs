@@ -1,28 +1,70 @@
-import { launchCommand, LaunchType, LocalStorage } from "@raycast/api";
+import { useEffect, useRef } from "react";
+import { LaunchType, LocalStorage, launchCommand } from "@raycast/api";
 
-/**
- * Publish an event by optionally launching a list of Raycast commands in the
- * background so they re-read state and refresh their UI.
- *
- * Example: `publish('timersChanged', ['menubar', 'today'])`.
- */
-export async function publish(event: string, targets?: string[], payload?: any) {
-  // write an event marker to LocalStorage so other processes can observe
-  try {
-    const key = `jira-worklogs:event:${event}`;
-    const data = JSON.stringify({ ts: Date.now(), payload: payload ?? null });
-    await LocalStorage.setItem(key, data);
-  } catch (e) {
-    // ignore storage failures
-  }
+const EVENT_PREFIX = "jira-worklogs:event:";
+const POLL_INTERVAL_MS = 1000;
+export type EventTarget = "menubar" | "worklogs" | "select-issue";
 
-  if (!targets || targets.length === 0) return;
+type EventEnvelope = {
+  ts: number;
+};
 
-  for (const name of targets) {
+export const WORKLOGS_CHANGED_EVENT = "worklogs-changed";
+
+function getEventKey(event: string): string {
+  return `${EVENT_PREFIX}${event}`;
+}
+
+export async function publishEvent(event: string, targets: EventTarget[] = []): Promise<void> {
+  const payload: EventEnvelope = { ts: Date.now() };
+  await LocalStorage.setItem(getEventKey(event), JSON.stringify(payload));
+
+  for (const target of targets) {
     try {
-      await launchCommand({ name, type: LaunchType.Background });
-    } catch (e) {
-      // ignore failures for individual launches
+      await launchCommand({ name: target, type: LaunchType.Background });
+    } catch {
+      // ignore failures for individual command refreshes
     }
   }
+}
+
+export function useEventSubscription(event: string, onEvent: () => void): void {
+  const onEventRef = useRef(onEvent);
+
+  useEffect(() => {
+    onEventRef.current = onEvent;
+  }, [onEvent]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let lastSeen = 0;
+
+    async function poll() {
+      const raw = await LocalStorage.getItem<string>(getEventKey(event));
+      if (!raw || cancelled) {
+        return;
+      }
+
+      try {
+        const data = JSON.parse(raw) as EventEnvelope;
+        if (typeof data.ts === "number" && data.ts > lastSeen) {
+          const shouldNotify = lastSeen !== 0;
+          lastSeen = data.ts;
+          if (shouldNotify) {
+            onEventRef.current();
+          }
+        }
+      } catch {
+        // ignore malformed event payloads
+      }
+    }
+
+    poll();
+    const intervalId = setInterval(poll, POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [event]);
 }

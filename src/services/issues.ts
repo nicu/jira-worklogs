@@ -28,11 +28,27 @@ export async function loadIssuesFromDb(): Promise<IssuesData> {
 
 /** Fetch both issue buckets from Jira. */
 export async function fetchIssuesFromJira(): Promise<IssuesData> {
-  const [assignedRes, watchedRes] = await Promise.all([fetchIssues(ASSIGNED_JQL), fetchIssues(WATCHED_JQL)]);
+  const [assigned, watched] = await Promise.all([fetchAllIssues(ASSIGNED_JQL), fetchAllIssues(WATCHED_JQL)]);
   return {
-    assigned: sortByUpdated(assignedRes.issues),
-    watched: sortByUpdated(watchedRes.issues),
+    assigned: sortByUpdated(assigned),
+    watched: sortByUpdated(watched),
   };
+}
+
+async function fetchAllIssues(jql: string): Promise<JiraIssue[]> {
+  const issues: JiraIssue[] = [];
+  let nextPageToken: string | undefined;
+
+  while (true) {
+    const page = await fetchIssues(jql, { maxResults: 50, nextPageToken });
+    issues.push(...page.issues);
+
+    if (page.isLast || !page.nextPageToken) {
+      return issues;
+    }
+
+    nextPageToken = page.nextPageToken;
+  }
 }
 
 /**

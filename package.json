@@ -2,7 +2,7 @@
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "jira-worklogs",
   "title": "Jira Worklogs",
-  "description": "Track your time with timers and automatically sync your worklogs directly to Jira.",
+  "description": "Track time for Jira issues from Raycast.",
   "icon": "extension-icon.png",
   "author": "nicolae_ciocan",
   "platforms": [
@@ -12,63 +12,46 @@
   "categories": [
     "Productivity"
   ],
+  "preferences": [
+    {
+      "name": "menubarTextMaxLength",
+      "title": "Menubar Text Max Length",
+      "description": "Maximum number of characters shown for issue labels in the menubar title and items.",
+      "type": "textfield",
+      "default": "32",
+      "required": false
+    }
+  ],
   "license": "MIT",
   "commands": [
     {
-      "name": "picker",
-      "title": "Pick Jira Ticket",
-      "subtitle": "Add a ticket to today's list and start tracking time",
-      "description": "Choose a Jira ticket, add it to today's list and start or stop a timer to track your work",
+      "name": "select-issue",
+      "title": "Select Issue",
+      "subtitle": "Pick a Jira issue and start tracking time",
+      "description": "Browse your Jira issues and start a timer for the work you are doing",
       "mode": "view"
     },
     {
       "name": "worklogs",
-      "title": "View worklogs",
-      "subtitle": "See your tracked time at a glance",
-      "description": "View all worklogs for the current month",
+      "title": "Worklogs",
+      "subtitle": "Review tracked time day by day",
+      "description": "View your worklogs for today by default and navigate to other dates when needed",
       "mode": "view"
     },
     {
       "name": "menubar",
       "title": "Jira Worklogs Menubar",
-      "subtitle": "Show your worklogs in the menu bar",
-      "description": "Enable a menu bar view to quickly see today's tracked time and access your Jira worklogs anytime",
+      "subtitle": "See the current timer and today's total",
+      "description": "Show your current tracking status in the menu bar and jump into worklogs or issue selection",
       "mode": "menu-bar"
-    },
-    {
-      "name": "calendar",
-      "title": "View Worklogs Calendar",
-      "subtitle": "View your worklogs in calendar view",
-      "description": "View your tracked time in a clear calendar overview",
-      "mode": "view"
-    },
-    {
-      "name": "today",
-      "title": "Today's Worklogs",
-      "subtitle": "See and manage today's tracked time",
-      "description": "View the active timer and all completed worklogs for today, with options to sync and fill gaps",
-      "mode": "view",
-      "preferences": [
-        {
-          "name": "workdayHours",
-          "title": "Workday Length (hours)",
-          "description": "The number of hours in your workday. Used to determine when gaps can be filled.",
-          "type": "textfield",
-          "required": false,
-          "default": "8",
-          "placeholder": "8"
-        }
-      ]
     }
   ],
   "dependencies": {
     "@raycast/api": "^1.104.7",
     "@raycast/utils": "^1.17.0",
-    "sql.js": "^1.14.0",
-    "typemockr": "^0.1.8"
+    "sql.js": "^1.14.0"
   },
   "devDependencies": {
-    "@faker-js/faker": "^10.3.0",
     "@raycast/eslint-config": "^2.0.4",
     "@types/node": "22.13.10",
     "@types/react": "19.0.10",

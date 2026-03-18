@@ -90,8 +90,12 @@ export async function saveIssues(assigned: JiraIssue[], watched: JiraIssue[]): P
   const assignedVals = buildValues(assigned, "assigned");
   const watchedVals = buildValues(watched, "watched");
   const all = [...assignedVals, ...watchedVals];
-  if (all.length === 0) return;
+  const now = new Date().toISOString();
   await query(`
+    DELETE FROM issues WHERE source IN ('assigned', 'watched');
+    ${
+      all.length > 0
+        ? `
     INSERT INTO issues (
       id, key, self, source, summary,
       updated_at, created_at,
@@ -125,10 +129,10 @@ export async function saveIssues(assigned: JiraIssue[], watched: JiraIssue[]): P
       priority_icon_url = excluded.priority_icon_url,
       assignee_account_id = excluded.assignee_account_id,
       assignee_display_name = excluded.assignee_display_name,
-      assignee_avatar_url = excluded.assignee_avatar_url
-  `);
-  const now = new Date().toISOString();
-  await query(`
+      assignee_avatar_url = excluded.assignee_avatar_url;
+    `
+        : ""
+    }
     INSERT INTO fetch_metadata(source, last_fetched_at) VALUES ('assigned', '${now}')
     ON CONFLICT(source) DO UPDATE SET last_fetched_at = excluded.last_fetched_at;
     INSERT INTO fetch_metadata(source, last_fetched_at) VALUES ('watched', '${now}')

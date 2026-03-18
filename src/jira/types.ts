@@ -3,6 +3,9 @@ export interface JiraUser {
   displayName: string;
   emailAddress?: string;
   avatarUrls: Record<string, string>;
+  self?: string;
+  active?: boolean;
+  timeZone?: string;
 }
 
 export interface JiraStatusCategory {
@@ -56,9 +59,11 @@ export interface JiraIssue {
 
 export interface JiraSearchResponse {
   issues: JiraIssue[];
-  total: number;
-  maxResults: number;
-  startAt: number;
+  total?: number;
+  maxResults?: number;
+  startAt?: number;
+  isLast?: boolean;
+  nextPageToken?: string;
 }
 
 export interface JiraAccessibleResource {
@@ -67,4 +72,24 @@ export interface JiraAccessibleResource {
   url: string;
   scopes: string[];
   avatarUrl: string;
+}
+
+export type JiraCurrentUser = JiraUser;
+
+export interface JiraWorklog {
+  id: string;
+  issueId: string;
+  started: string;
+  updated: string;
+  timeSpent: string;
+  timeSpentSeconds: number;
+  author: JiraUser;
+  updateAuthor: JiraUser;
+}
+
+export interface JiraPageOfWorklogs {
+  startAt: number;
+  maxResults: number;
+  total: number;
+  worklogs: JiraWorklog[];
 }

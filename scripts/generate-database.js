@@ -17,17 +17,32 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS issues (
     id TEXT PRIMARY KEY,
     key TEXT NOT NULL,
+    self TEXT NOT NULL,
     source TEXT NOT NULL,
 
     summary TEXT NOT NULL,
-    status_name TEXT NOT NULL,
-    status_category_key TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
 
+    status_id TEXT NOT NULL,
+    status_name TEXT NOT NULL,
+    status_category_id INTEGER NOT NULL,
+    status_category_key TEXT NOT NULL,
+    status_category_name TEXT NOT NULL,
+
+    issuetype_id TEXT NOT NULL,
+    issuetype_name TEXT NOT NULL,
     issuetype_icon_url TEXT NOT NULL,
 
+    project_id TEXT NOT NULL,
+    project_key TEXT NOT NULL,
+    project_name TEXT NOT NULL,
+
+    priority_id TEXT,
     priority_name TEXT,
     priority_icon_url TEXT,
 
+    assignee_account_id TEXT,
     assignee_display_name TEXT,
     assignee_avatar_url TEXT
   );
@@ -35,6 +50,9 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS timers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     task_id TEXT NOT NULL,
+    issue_key TEXT,
+    issue_summary TEXT,
+    issuetype_icon_url TEXT,
 
     started_at_utc TEXT NOT NULL,
     ended_at_utc TEXT,

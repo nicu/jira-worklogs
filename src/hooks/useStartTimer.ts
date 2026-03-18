@@ -1,5 +1,6 @@
 import { closeMainWindow, showToast, Toast } from "@raycast/api";
 import { startTimer } from "../db/timers";
+import { publishEvent, WORKLOGS_CHANGED_EVENT } from "../services/eventBus";
 
 /**
  * Returns an async callback that starts a timer for an issue.
@@ -8,10 +9,20 @@ import { startTimer } from "../db/timers";
  *   to stay in the view and re-render instead.
  */
 export function useStartTimer(onSuccess?: () => void | Promise<void>) {
-  return async function handleStartTimer(issueId: string, issueKey: string, issueSummary: string): Promise<void> {
+  return async function handleStartTimer(
+    issueId: string,
+    issueKey: string,
+    issueSummary: string,
+    issuetypeIconUrl?: string,
+  ): Promise<void> {
     const toast = await showToast({ style: Toast.Style.Animated, title: "Starting timer…", message: issueKey });
     try {
-      await startTimer(issueId);
+      await startTimer(issueId, {
+        issueKey,
+        issueSummary,
+        issuetypeIconUrl,
+      });
+      await publishEvent(WORKLOGS_CHANGED_EVENT, ["menubar"]);
       toast.style = Toast.Style.Success;
       toast.title = "Timer started";
       toast.message = `${issueKey} · ${issueSummary}`;

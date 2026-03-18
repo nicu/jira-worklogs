@@ -22,6 +22,7 @@ export const jiraOAuth = new OAuthService({
   scope: [
     "read:jira-user",
     "read:jira-work",
+    "write:jira-work",
     "offline_access", // request refresh token support where available/required
   ],
 });
