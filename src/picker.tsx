@@ -1,6 +1,10 @@
-import { Action, ActionPanel, Color, Icon, List, showToast, Toast } from "@raycast/api";
-import { useIssues } from "./hooks/useIssues";
+import { Action, ActionPanel, Color, Icon, List, useNavigation } from "@raycast/api";
+// import { useIssues } from "./hooks/useIssues";
+import { useStartTimer } from "./hooks/useStartTimer";
 import type { JiraIssue } from "./jira/types";
+import TodayCommand from "./today";
+import { MockJiraIssue } from "./mocks/jira.mock";
+import { faker } from "@faker-js/faker/locale/zu_ZA";
 
 const STATUS_CATEGORY_COLOR: Record<string, Color> = {
   new: Color.Blue,
@@ -8,7 +12,12 @@ const STATUS_CATEGORY_COLOR: Record<string, Color> = {
   done: Color.Green,
 };
 
+const EMPTY_ACCESSORRY = "    ";
+
 function IssueListItem({ issue, onRefresh }: { issue: JiraIssue; onRefresh: () => void }) {
+  const { push } = useNavigation();
+  const startTimer = useStartTimer(() => push(<TodayCommand />));
+
   return (
     <List.Item
       icon={{ source: issue.fields.issuetype.iconUrl }}
@@ -19,7 +28,7 @@ function IssueListItem({ issue, onRefresh }: { issue: JiraIssue; onRefresh: () =
           <Action
             title="Select Issue"
             icon={Icon.CheckCircle}
-            onAction={() => showToast({ style: Toast.Style.Success, title: issue.key, message: issue.fields.summary })}
+            onAction={() => startTimer(issue.id, issue.key, issue.fields.summary)}
           />
           <Action
             title="Refresh"
@@ -30,25 +39,29 @@ function IssueListItem({ issue, onRefresh }: { issue: JiraIssue; onRefresh: () =
         </ActionPanel>
       }
       accessories={[
+        issue.fields.priority
+          ? { icon: { source: issue.fields.priority.iconUrl }, tooltip: issue.fields.priority.name }
+          : {},
+        issue.fields.assignee
+          ? { icon: { source: issue.fields.assignee.avatarUrls["32x32"] }, tooltip: issue.fields.assignee.displayName }
+          : {},
         {
           tag: {
             value: issue.fields.status.name,
             color: STATUS_CATEGORY_COLOR[issue.fields.status.statusCategory.key] ?? Color.SecondaryText,
           },
         },
-        issue.fields.assignee
-          ? { icon: { source: issue.fields.assignee.avatarUrls["32x32"] }, tooltip: issue.fields.assignee.displayName }
-          : {},
-        issue.fields.priority
-          ? { icon: { source: issue.fields.priority.iconUrl }, tooltip: issue.fields.priority.name }
-          : {},
       ]}
     />
   );
 }
 
 export default function Command() {
-  const { assigned, watched, isLoading, refresh } = useIssues();
+  // const { assigned, watched, isLoading, refresh } = useIssues();
+  const assigned = faker.helpers.multiple(() => MockJiraIssue(), { count: { min: 3, max: 25 } });
+  const watched = faker.helpers.multiple(() => MockJiraIssue(), { count: { min: 3, max: 25 } });
+  const isLoading = false;
+  const refresh = () => {};
 
   return (
     <List isLoading={isLoading} searchBarPlaceholder="Search...">

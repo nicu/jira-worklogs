@@ -41,14 +41,34 @@
       "subtitle": "View your worklogs in calendar view",
       "description": "View your tracked time in a clear calendar overview",
       "mode": "view"
+    },
+    {
+      "name": "today",
+      "title": "Today's Worklogs",
+      "subtitle": "See and manage today's tracked time",
+      "description": "View the active timer and all completed worklogs for today, with options to sync and fill gaps",
+      "mode": "view",
+      "preferences": [
+        {
+          "name": "workdayHours",
+          "title": "Workday Length (hours)",
+          "description": "The number of hours in your workday. Used to determine when gaps can be filled.",
+          "type": "textfield",
+          "required": false,
+          "default": "8",
+          "placeholder": "8"
+        }
+      ]
     }
   ],
   "dependencies": {
     "@raycast/api": "^1.104.7",
     "@raycast/utils": "^1.17.0",
-    "sql.js": "^1.14.0"
+    "sql.js": "^1.14.0",
+    "typemockr": "^0.1.8"
   },
   "devDependencies": {
+    "@faker-js/faker": "^10.3.0",
     "@raycast/eslint-config": "^2.0.4",
     "@types/node": "22.13.10",
     "@types/react": "19.0.10",

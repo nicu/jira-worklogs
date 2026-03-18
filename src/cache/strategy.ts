@@ -1,10 +1,3 @@
-/**
- * Create a sync function in a functional style.
- *
- * Example:
- *   const syncIssues = createSync(loadFromDb, fetchRemote, saveToDb, getLastFetch, ttlMs)
- *   await syncIssues(forceRefresh, onCachedData)
- */
 export function createSync<T>(
   loadFromDb: () => Promise<T>,
   fetchFromRemote: () => Promise<T>,

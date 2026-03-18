@@ -5,10 +5,16 @@ export interface JiraUser {
   avatarUrls: Record<string, string>;
 }
 
+export interface JiraStatusCategory {
+  id: number;
+  key: string;
+  name: string;
+}
+
 export interface JiraStatus {
   id: string;
   name: string;
-  statusCategory: { id: number; key: string; name: string };
+  statusCategory: JiraStatusCategory;
 }
 
 export interface JiraPriority {
@@ -30,20 +36,22 @@ export interface JiraIssuetype {
   iconUrl: string;
 }
 
+export interface JiraIssueFields {
+  summary: string;
+  status: JiraStatus;
+  priority: JiraPriority | null;
+  project: JiraProject;
+  issuetype: JiraIssuetype;
+  assignee: JiraUser | null;
+  updated: string;
+  created: string;
+}
+
 export interface JiraIssue {
   id: string;
   key: string;
   self: string;
-  fields: {
-    summary: string;
-    status: JiraStatus;
-    priority: JiraPriority | null;
-    project: JiraProject;
-    issuetype: JiraIssuetype;
-    assignee: JiraUser | null;
-    updated: string;
-    created: string;
-  };
+  fields: JiraIssueFields;
 }
 
 export interface JiraSearchResponse {
