@@ -6,6 +6,7 @@ import type { JiraIssue } from "../jira/types";
 const ASSIGNED_JQL = "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC";
 const WATCHED_JQL =
   "watcher = currentUser() AND assignee != currentUser() AND statusCategory != Done ORDER BY updated DESC";
+const REMOTE_SEARCH_MAX_RESULTS = 20;
 
 export const ISSUES_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -18,6 +19,10 @@ function sortByUpdated(issues: JiraIssue[]): JiraIssue[] {
   return issues.sort(
     (a, b) => (new Date(b.fields.updated).getTime() || 0) - (new Date(a.fields.updated).getTime() || 0),
   );
+}
+
+function escapeJqlString(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
 /** Read both issue buckets from the local DB. */
@@ -49,6 +54,18 @@ async function fetchAllIssues(jql: string): Promise<JiraIssue[]> {
 
     nextPageToken = page.nextPageToken;
   }
+}
+
+export async function searchIssuesInJira(query: string): Promise<JiraIssue[]> {
+  const trimmedQuery = query.trim();
+  if (!trimmedQuery) {
+    return [];
+  }
+
+  const escapedQuery = escapeJqlString(trimmedQuery);
+  const jql = `(issuekey = "${escapedQuery}" OR text ~ "${escapedQuery}") ORDER BY updated DESC`;
+  const page = await fetchIssues(jql, { maxResults: REMOTE_SEARCH_MAX_RESULTS });
+  return sortByUpdated(page.issues);
 }
 
 /**
