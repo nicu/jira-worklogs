@@ -4,13 +4,14 @@ import {
   getSyncableTimersForDay,
   getSyncableTimersForIssueDay,
   markTimersAsSynced,
+  replaceUnsyncedLocalDurationForIssueDay,
   saveRemoteWorklogs,
   type RemoteTimerInput,
   type SyncableTimerRow,
 } from "../db/timers";
 import { createIssueWorklog, fetchIssueWorklogs, fetchIssues, getCurrentUser } from "../jira/jira.service";
 import type { JiraIssue, JiraWorklog } from "../jira/types";
-import { formatJiraStartedAt, getDayBounds } from "../utils/time";
+import { formatDurationInput, formatJiraStartedAt, getDayBounds } from "../utils/time";
 
 const REMOTE_WORKLOGS_CACHE_TTL_MS = 5 * 60 * 1000;
 const REMOTE_WORKLOGS_FETCH_PREFIX = "jira-worklogs";
@@ -87,7 +88,6 @@ function groupTimersIntoWorklogs(timers: SyncableTimerRow[]): SyncableWorklogGro
       existing.startedAtUtc = timer.started_at_utc;
       existing.tzOffsetMin = timer.tz_offset_min;
     }
-
   }
 
   return Array.from(groups.values()).sort((left, right) => {
@@ -211,7 +211,9 @@ async function createJiraWorklogsFromTimers(localDay: string, timers: SyncableTi
 
   if (firstError) {
     if (successfulMappings.length > 0) {
-      throw new Error(`Saved ${successfulWorklogCount} worklog(s) before Jira returned an error: ${firstError.message}`);
+      throw new Error(
+        `Saved ${successfulWorklogCount} worklog(s) before Jira returned an error: ${firstError.message}`,
+      );
     }
 
     throw firstError;
@@ -231,4 +233,25 @@ export async function saveIssueWorklogsToJira(taskId: string, localDay: string) 
 export async function saveDayWorklogsToJira(localDay: string) {
   const timers = await getSyncableTimersForDay(localDay);
   return createJiraWorklogsFromTimers(localDay, timers);
+}
+
+export async function updateIssueWorklogTotalDuration(
+  taskId: string,
+  localDay: string,
+  totalDurationSeconds: number,
+  minimumSyncedSeconds: number,
+) {
+  const safeTotalDurationSeconds = Math.max(0, Math.round(totalDurationSeconds));
+  const safeMinimumSyncedSeconds = Math.max(0, Math.round(minimumSyncedSeconds));
+
+  if (safeTotalDurationSeconds < safeMinimumSyncedSeconds) {
+    throw new Error(`Minimum is ${formatDurationInput(safeMinimumSyncedSeconds)}`);
+  }
+
+  await replaceUnsyncedLocalDurationForIssueDay(taskId, localDay, safeTotalDurationSeconds - safeMinimumSyncedSeconds);
+
+  return {
+    totalDurationSeconds: safeTotalDurationSeconds,
+    unsyncedLocalDurationSeconds: safeTotalDurationSeconds - safeMinimumSyncedSeconds,
+  };
 }

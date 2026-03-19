@@ -362,3 +362,69 @@ export async function markTimersAsSynced(
     WHERE id IN (${ids})
   `);
 }
+
+export async function replaceUnsyncedLocalDurationForIssueDay(
+  taskId: string,
+  localDay: string,
+  targetUnsyncedSeconds: number,
+): Promise<void> {
+  const timers = await getSyncableTimersForIssueDay(taskId, localDay);
+  if (timers.length === 0) {
+    throw new Error("This worklog has no unsynced local time to edit");
+  }
+
+  const safeTargetUnsyncedSeconds = Math.max(0, Math.round(targetUnsyncedSeconds));
+  const currentUnsyncedSeconds = timers.reduce(
+    (total, timer) => total + Math.max(0, Number(timer.duration_seconds ?? 0)),
+    0,
+  );
+  if (currentUnsyncedSeconds === safeTargetUnsyncedSeconds) {
+    return;
+  }
+
+  const baseTimer = timers[0];
+  const timerIds = timers.map((timer) => timer.id).join(", ");
+
+  if (safeTargetUnsyncedSeconds === 0) {
+    await query(`
+      DELETE FROM timers
+      WHERE id IN (${timerIds})
+    `);
+    return;
+  }
+
+  const startedAtUtc = baseTimer.started_at_utc;
+  const endedAtUtc = new Date(new Date(startedAtUtc).getTime() + safeTargetUnsyncedSeconds * 1000).toISOString();
+
+  await query(`
+    DELETE FROM timers
+    WHERE id IN (${timerIds});
+
+    INSERT INTO timers (
+      task_id,
+      issue_key,
+      issue_summary,
+      issuetype_icon_url,
+      started_at_utc,
+      ended_at_utc,
+      tz_offset_min,
+      local_day,
+      type,
+      adjustment_reason,
+      sync_status
+    )
+    VALUES (
+      '${esc(taskId)}',
+      ${nullable(baseTimer.issue_key)},
+      ${nullable(baseTimer.issue_summary)},
+      ${nullable(baseTimer.issuetype_icon_url)},
+      '${esc(startedAtUtc)}',
+      '${esc(endedAtUtc)}',
+      ${baseTimer.tz_offset_min},
+      '${esc(localDay)}',
+      'adjustment',
+      'manual-edit',
+      'local'
+    )
+  `);
+}

@@ -14,17 +14,21 @@ import {
   useNavigation,
 } from "@raycast/api";
 import { getLocalDay, sumTotalSeconds, type WorklogRow } from "./db/timers";
-import { useStartTimer } from "./hooks/useStartTimer";
 import { useSaveWorklogsToJira } from "./hooks/useSaveWorklogsToJira";
+import { useStartTimer } from "./hooks/useStartTimer";
 import { useStopTimer } from "./hooks/useStopTimer";
 import { getIssueBrowseUrl } from "./jira/jira.service";
 import { useWorklogs } from "./hooks/useWorklogs";
+import { publishEvent, WORKLOGS_CHANGED_EVENT } from "./services/eventBus";
+import { updateIssueWorklogTotalDuration } from "./services/worklogs";
 import {
   formatDateInputValue,
   formatDayLabel,
   formatDuration,
+  formatDurationInput,
   formatElapsed,
   parseDateInput,
+  parseDurationInput,
   shiftDateByDays,
   startOfDay,
 } from "./utils/time";
@@ -39,6 +43,68 @@ async function openCommand(name: "select-issue" | "worklogs") {
 
 function formatTotal(totalSeconds: number): string | undefined {
   return totalSeconds > 0 ? formatDuration(totalSeconds) : undefined;
+}
+
+function getWorklogDisplayTitle(worklog: WorklogRow): string {
+  return worklog.issue_key ?? worklog.task_id;
+}
+
+function getWorklogDisplayLabel(worklog: WorklogRow): string {
+  const title = getWorklogDisplayTitle(worklog);
+  return worklog.issue_summary ? `${title} · ${worklog.issue_summary}` : title;
+}
+
+function getMinimumSyncedSeconds(worklog: WorklogRow): number {
+  return Math.max(0, worklog.total_duration_seconds - worklog.unsynced_local_duration_seconds);
+}
+
+function buildRecentDateOptions(selectedDate: Date): Array<{ title: string; value: string }> {
+  const today = startOfDay(new Date());
+  const selectedValue = formatDateInputValue(selectedDate);
+  const options: Array<{ title: string; value: string }> = [];
+  const seenValues = new Set<string>();
+
+  for (let offset = 0; offset <= 31; offset += 1) {
+    const date = shiftDateByDays(today, -offset);
+    const value = formatDateInputValue(date);
+    const year = offset > 1 ? `, ${date.getFullYear()}` : "";
+    seenValues.add(value);
+    options.push({
+      value,
+      title: `${formatDayLabel(date)}${year}`,
+    });
+  }
+
+  if (!seenValues.has(selectedValue)) {
+    options.push({
+      value: selectedValue,
+      title: `${formatDayLabel(selectedDate)} · ${selectedValue}`,
+    });
+  }
+
+  return options;
+}
+
+function DateDropdown({ selectedDate, onSelectDate }: { selectedDate: Date; onSelectDate: (date: Date) => void }) {
+  const selectedValue = formatDateInputValue(selectedDate);
+
+  return (
+    <List.Dropdown
+      tooltip="Show Worklogs For Date"
+      storeValue={false}
+      value={selectedValue}
+      onChange={(value) => {
+        const parsedDate = parseDateInput(value, new Date());
+        if (parsedDate) {
+          onSelectDate(startOfDay(parsedDate));
+        }
+      }}
+    >
+      {buildRecentDateOptions(selectedDate).map((option) => (
+        <List.Dropdown.Item key={option.value} title={option.title} value={option.value} />
+      ))}
+    </List.Dropdown>
+  );
 }
 
 function DateInputView({ date, onSelect }: { date: Date; onSelect: (date: Date) => void }) {
@@ -84,6 +150,102 @@ function DateInputView({ date, onSelect }: { date: Date; onSelect: (date: Date) 
         text="Examples: 2026-03-18, 18-03-2026, 18/03/2026, 03/18/2026, today, yesterday. Use ISO for ambiguous slash dates."
       />
       <Form.TextField id="dateInput" title="Date" defaultValue={formatDateInputValue(date)} placeholder="2026-03-18" />
+    </Form>
+  );
+}
+
+function EditWorklogView({
+  worklog,
+  selectedDate,
+  onSave,
+}: {
+  worklog: WorklogRow;
+  selectedDate: Date;
+  onSave: () => void | Promise<void>;
+}) {
+  const { pop } = useNavigation();
+  const minimumSyncedSeconds = getMinimumSyncedSeconds(worklog);
+  const [durationInput, setDurationInput] = useState(() => formatDurationInput(worklog.total_duration_seconds));
+  const [durationError, setDurationError] = useState<string>();
+
+  async function handleSubmit() {
+    const nextTotalSeconds = parseDurationInput(durationInput);
+    if (nextTotalSeconds == null) {
+      setDurationError("Use values like 4h, 30m, 1h 15m, or 1:15:00.");
+      return;
+    }
+
+    if (nextTotalSeconds < minimumSyncedSeconds) {
+      setDurationError(`Minimum is ${formatDurationInput(minimumSyncedSeconds)} because that time is already in Jira.`);
+      return;
+    }
+
+    const toast = await showToast({
+      style: Toast.Style.Animated,
+      title: "Updating worklog…",
+      message: getWorklogDisplayTitle(worklog),
+    });
+
+    try {
+      const result = await updateIssueWorklogTotalDuration(
+        worklog.task_id,
+        worklog.local_day,
+        nextTotalSeconds,
+        minimumSyncedSeconds,
+      );
+
+      await publishEvent(WORKLOGS_CHANGED_EVENT, ["menubar"]);
+      await onSave();
+
+      toast.style = Toast.Style.Success;
+      toast.title = result.totalDurationSeconds === 0 ? "Worklog Cleared" : "Worklog Updated";
+      toast.message =
+        result.totalDurationSeconds === 0
+          ? getWorklogDisplayTitle(worklog)
+          : `${getWorklogDisplayTitle(worklog)} · ${formatDurationInput(result.totalDurationSeconds)}`;
+
+      pop();
+    } catch (error) {
+      toast.style = Toast.Style.Failure;
+      toast.title = "Failed to Update Worklog";
+      toast.message = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  return (
+    <Form
+      actions={
+        <ActionPanel>
+          <Action.SubmitForm title="Save Worklog" onSubmit={handleSubmit} />
+        </ActionPanel>
+      }
+    >
+      <Form.Description title="Issue" text={getWorklogDisplayLabel(worklog)} />
+      <Form.Description title="Date" text={`${formatDayLabel(selectedDate)} · ${formatDateInputValue(selectedDate)}`} />
+      <Form.Description
+        title="How It Works"
+        text="Editing replaces only the local unsynced portion. Already-synced Jira time stays untouched."
+      />
+      <Form.Description
+        title="Minimum"
+        text={
+          minimumSyncedSeconds > 0
+            ? `${formatDurationInput(minimumSyncedSeconds)} is already synced to Jira and cannot be reduced.`
+            : "You can reduce this worklog all the way to 0m if you want to remove the unsynced local time."
+        }
+      />
+      <Form.TextField
+        id="durationInput"
+        title="Total Time"
+        placeholder="6h or 1h 30m"
+        value={durationInput}
+        error={durationError}
+        onChange={(value) => {
+          setDurationInput(value);
+          setDurationError(undefined);
+        }}
+        info="Supports values like 4h, 30m, 1h 15m, or 1:15:00."
+      />
     </Form>
   );
 }
@@ -194,6 +356,7 @@ function WorklogActions({
   const startTimer = useStartTimer();
   const stopTimer = useStopTimer(onReload);
   const issueKey = worklog.issue_key;
+  const canEditWorklog = !isActive && worklog.unsynced_local_duration_seconds > 0;
 
   return (
     <ActionPanel>
@@ -218,6 +381,14 @@ function WorklogActions({
           title="Open Issue in Browser"
           icon={Icon.Globe}
           onAction={async () => open(await getIssueBrowseUrl(issueKey))}
+        />
+      ) : null}
+      {canEditWorklog ? (
+        <Action.Push
+          title="Edit Worklog"
+          icon={Icon.Pencil}
+          shortcut={{ modifiers: ["cmd"], key: "e" }}
+          target={<EditWorklogView worklog={worklog} selectedDate={selectedDate} onSave={onReload} />}
         />
       ) : null}
       <Action
@@ -265,7 +436,7 @@ function WorklogItem({
   return (
     <List.Item
       icon={{ source: worklog.issuetype_icon_url || Icon.Clock }}
-      title={worklog.issue_key ?? worklog.task_id}
+      title={getWorklogDisplayTitle(worklog)}
       subtitle={worklog.issue_summary ?? undefined}
       accessories={[
         ...(totalSeconds > 0 || isActive
@@ -314,12 +485,14 @@ export default function Command() {
   const totalSeconds = sumTotalSeconds(worklogs) + activeElapsed;
   const sectionTitle = formatDayLabel(selectedDate);
   const sectionSubtitle = formatTotal(totalSeconds);
+  const dateDropdown = <DateDropdown selectedDate={selectedDate} onSelectDate={setSelectedDate} />;
 
   if (!isLoading && worklogs.length === 0) {
     return (
       <List
         isLoading={isLoading || isSyncingRemote}
         searchBarPlaceholder={`Search ${sectionTitle.toLowerCase()} worklogs...`}
+        searchBarAccessory={dateDropdown}
       >
         <List.EmptyView
           icon={error ? Icon.ExclamationMark : Icon.Clock}
@@ -344,6 +517,7 @@ export default function Command() {
     <List
       isLoading={isLoading || isSyncingRemote}
       searchBarPlaceholder={`Search ${sectionTitle.toLowerCase()} worklogs...`}
+      searchBarAccessory={dateDropdown}
     >
       <List.Section
         title={sectionTitle}

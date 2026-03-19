@@ -27,6 +27,76 @@ export function formatElapsed(totalSeconds: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+const JIRA_DURATION_UNITS = {
+  h: 3600,
+  m: 60,
+  s: 1,
+} as const;
+
+export function formatDurationInput(totalSeconds: number): string {
+  const safeSeconds = Math.max(0, Math.round(totalSeconds));
+  const hours = Math.floor(safeSeconds / JIRA_DURATION_UNITS.h);
+  const minutes = Math.floor((safeSeconds % JIRA_DURATION_UNITS.h) / JIRA_DURATION_UNITS.m);
+  const seconds = safeSeconds % JIRA_DURATION_UNITS.m;
+  const parts: string[] = [];
+
+  if (hours > 0) {
+    parts.push(`${hours}h`);
+  }
+
+  if (minutes > 0) {
+    parts.push(`${minutes}m`);
+  }
+
+  if (seconds > 0) {
+    parts.push(`${seconds}s`);
+  }
+
+  return parts.length > 0 ? parts.join(" ") : "0m";
+}
+
+function parseClockDurationInput(value: string): number | null {
+  const match = value.match(/^(\d+):([0-5]?\d)(?::([0-5]?\d))?$/);
+  if (!match) {
+    return null;
+  }
+
+  if (match[3] != null) {
+    return Number(match[1]) * JIRA_DURATION_UNITS.h + Number(match[2]) * JIRA_DURATION_UNITS.m + Number(match[3]);
+  }
+
+  return Number(match[1]) * JIRA_DURATION_UNITS.m + Number(match[2]);
+}
+
+export function parseDurationInput(value: string): number | null {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+
+  const clockDuration = parseClockDurationInput(normalized);
+  if (clockDuration != null) {
+    return clockDuration;
+  }
+
+  let totalSeconds = 0;
+  let matchedAtLeastOneToken = false;
+  const remainder = normalized.replace(
+    /(\d+(?:\.\d+)?)\s*([hms])/g,
+    (_, amount, unit: keyof typeof JIRA_DURATION_UNITS) => {
+      matchedAtLeastOneToken = true;
+      totalSeconds += Number(amount) * JIRA_DURATION_UNITS[unit];
+      return "";
+    },
+  );
+
+  if (!matchedAtLeastOneToken || remainder.replace(/[\s,]+/g, "").length > 0) {
+    return null;
+  }
+
+  return Math.round(totalSeconds);
+}
+
 function buildValidDate(year: number, month: number, day: number): Date | null {
   const date = new Date(year, month - 1, day);
   date.setHours(0, 0, 0, 0);

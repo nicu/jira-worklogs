@@ -83,9 +83,9 @@ export default function Command() {
         )}
       </MenuBarExtra.Section>
       <MenuBarExtra.Section title="Actions">
-        <MenuBarExtra.Item title="Open Worklogs..." icon={Icon.List} onAction={() => openCommand("worklogs")} />
+        <MenuBarExtra.Item title="Open Worklogs" icon={Icon.List} onAction={() => openCommand("worklogs")} />
         <MenuBarExtra.Item
-          title="Select Issue..."
+          title="Select Issue"
           icon={Icon.MagnifyingGlass}
           onAction={() => openCommand("select-issue")}
         />
