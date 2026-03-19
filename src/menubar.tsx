@@ -40,6 +40,34 @@ export default function Command() {
   const startTimer = useStartTimer(reload);
   const stopTimer = useStopTimer(reload);
 
+  function renderWorklogItem(worklog: (typeof worklogs)[number]) {
+    const isActive = activeTimer?.task_id === worklog.task_id;
+    const elapsed = isActive ? Math.floor((Date.now() - new Date(activeTimer.started_at_utc).getTime()) / 1000) : 0;
+    const totalSeconds = worklog.total_duration_seconds + elapsed;
+    const fullLabel = buildIssueLabel(worklog.issue_key ?? worklog.task_id, worklog.issue_summary);
+    const isSynced = worklog.is_synced === 1 && !isActive;
+
+    return (
+      <MenuBarExtra.Item
+        key={worklog.task_id}
+        title={truncateText(fullLabel, maxTitleLength)}
+        subtitle={totalSeconds > 0 ? formatDuration(totalSeconds) : "No logged time"}
+        tooltip={fullLabel}
+        icon={getWorklogIcon(isActive, isSynced)}
+        onAction={() =>
+          isActive
+            ? stopTimer(worklog.issue_key ?? worklog.task_id)
+            : startTimer(
+                worklog.task_id,
+                worklog.issue_key ?? worklog.task_id,
+                worklog.issue_summary ?? "",
+                worklog.issuetype_icon_url ?? undefined,
+              )
+        }
+      />
+    );
+  }
+
   return (
     <MenuBarExtra
       icon={menuIcon}
@@ -47,41 +75,13 @@ export default function Command() {
       tooltip={activeLabel ? `${activeLabel} running` : "Jira Worklogs"}
       isLoading={isLoading || isSyncingRemote}
     >
-      <MenuBarExtra.Section title="Today">
-        {worklogs.length > 0 ? (
-          worklogs.map((worklog) => {
-            const isActive = activeTimer?.task_id === worklog.task_id;
-            const elapsed = isActive
-              ? Math.floor((Date.now() - new Date(activeTimer.started_at_utc).getTime()) / 1000)
-              : 0;
-            const totalSeconds = worklog.total_duration_seconds + elapsed;
-            const fullLabel = buildIssueLabel(worklog.issue_key ?? worklog.task_id, worklog.issue_summary);
-            const isSynced = worklog.is_synced === 1 && !isActive;
-
-            return (
-              <MenuBarExtra.Item
-                key={worklog.task_id}
-                title={truncateText(fullLabel, maxTitleLength)}
-                subtitle={totalSeconds > 0 ? formatDuration(totalSeconds) : "No logged time"}
-                tooltip={fullLabel}
-                icon={getWorklogIcon(isActive, isSynced)}
-                onAction={() =>
-                  isActive
-                    ? stopTimer(worklog.issue_key ?? worklog.task_id)
-                    : startTimer(
-                        worklog.task_id,
-                        worklog.issue_key ?? worklog.task_id,
-                        worklog.issue_summary ?? "",
-                        worklog.issuetype_icon_url ?? undefined,
-                      )
-                }
-              />
-            );
-          })
-        ) : (
+      {worklogs.length > 0 ? (
+        <MenuBarExtra.Section title="Today">{worklogs.map(renderWorklogItem)}</MenuBarExtra.Section>
+      ) : (
+        <MenuBarExtra.Section title="Today">
           <MenuBarExtra.Item title="No Worklogs Yet" subtitle="Today has no worklogs" icon={Icon.Clock} />
-        )}
-      </MenuBarExtra.Section>
+        </MenuBarExtra.Section>
+      )}
       <MenuBarExtra.Section title="Actions">
         <MenuBarExtra.Item title="Open Worklogs" icon={Icon.List} onAction={() => openCommand("worklogs")} />
         <MenuBarExtra.Item

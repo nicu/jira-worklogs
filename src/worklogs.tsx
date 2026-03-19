@@ -432,6 +432,7 @@ function WorklogItem({
   const totalSeconds = worklog.total_duration_seconds + elapsed;
   const totalLabel = isActive ? formatElapsed(totalSeconds) : formatDuration(totalSeconds);
   const showSynced = worklog.is_synced === 1 && !isActive;
+  const timeColor = isActive ? Color.Red : showSynced ? Color.Green : Color.SecondaryText;
 
   return (
     <List.Item
@@ -439,22 +440,22 @@ function WorklogItem({
       title={getWorklogDisplayTitle(worklog)}
       subtitle={worklog.issue_summary ?? undefined}
       accessories={[
-        ...(totalSeconds > 0 || isActive
-          ? [
-              {
-                tag: {
-                  value: totalLabel,
-                  color: isActive ? Color.Red : Color.SecondaryText,
-                },
-                tooltip: isActive ? "Currently tracking" : "Total logged time",
-              },
-            ]
-          : []),
         ...(showSynced
           ? [
               {
                 icon: { source: Icon.CheckCircle, tintColor: Color.Green },
                 tooltip: "Synced with Jira",
+              },
+            ]
+          : []),
+        ...(totalSeconds > 0 || isActive
+          ? [
+              {
+                tag: {
+                  value: totalLabel,
+                  color: timeColor,
+                },
+                tooltip: isActive ? "Currently tracking" : "Total logged time",
               },
             ]
           : []),
@@ -486,6 +487,25 @@ export default function Command() {
   const sectionTitle = formatDayLabel(selectedDate);
   const sectionSubtitle = formatTotal(totalSeconds);
   const dateDropdown = <DateDropdown selectedDate={selectedDate} onSelectDate={setSelectedDate} />;
+
+  function renderWorklogItem(worklog: WorklogRow) {
+    const isActive = isToday && activeTimer?.task_id === worklog.task_id;
+
+    return (
+      <WorklogItem
+        key={worklog.task_id}
+        worklog={worklog}
+        isActive={isActive}
+        activeStartedAt={isActive ? activeTimer?.started_at_utc : undefined}
+        selectedDate={selectedDate}
+        onSelectDate={setSelectedDate}
+        onReload={reload}
+        onRefresh={refresh}
+        onSaveIssue={() => saveIssue(worklog.task_id, worklog.issue_key ?? worklog.task_id, selectedLocalDay)}
+        onSaveDay={() => saveDay(selectedLocalDay)}
+      />
+    );
+  }
 
   if (!isLoading && worklogs.length === 0) {
     return (
@@ -521,26 +541,9 @@ export default function Command() {
     >
       <List.Section
         title={sectionTitle}
-        subtitle={
-          isSyncingRemote ? `${sectionSubtitle ? `${sectionSubtitle} · ` : ""}refreshing Jira...` : sectionSubtitle
-        }
+        subtitle={isSyncingRemote ? `${sectionSubtitle ? `${sectionSubtitle} · ` : ""}refreshing Jira...` : sectionSubtitle}
       >
-        {worklogs.map((worklog) => (
-          <WorklogItem
-            key={worklog.task_id}
-            worklog={worklog}
-            isActive={isToday && activeTimer?.task_id === worklog.task_id}
-            activeStartedAt={
-              isToday && activeTimer?.task_id === worklog.task_id ? activeTimer.started_at_utc : undefined
-            }
-            selectedDate={selectedDate}
-            onSelectDate={setSelectedDate}
-            onReload={reload}
-            onRefresh={refresh}
-            onSaveIssue={() => saveIssue(worklog.task_id, worklog.issue_key ?? worklog.task_id, selectedLocalDay)}
-            onSaveDay={() => saveDay(selectedLocalDay)}
-          />
-        ))}
+        {worklogs.map(renderWorklogItem)}
       </List.Section>
     </List>
   );
